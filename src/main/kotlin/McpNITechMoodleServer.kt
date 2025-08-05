@@ -1,6 +1,7 @@
 package com.punyo.kotlinmcpserver
 
 import com.punyo.kotlinmcpserver.moodle.MoodleApiClient
+import com.punyo.kotlinmcpserver.moodle.MoodleApiClientUtil
 import com.punyo.kotlinmcpserver.moodle.data.UserInfo
 import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -13,8 +14,6 @@ import kotlinx.io.buffered
 import kotlinx.serialization.json.*
 import io.ktor.utils.io.streams.*
 import java.io.File
-import com.punyo.kotlinmcpserver.moodle.data.Course
-import com.punyo.kotlinmcpserver.moodle.data.Assignment
 
 fun runServer() {
     val moodleClient = MoodleApiClient()
@@ -63,8 +62,7 @@ fun runServer() {
                     content = listOf(TextContent("The 'course_name' parameter is required."))
                 )
 
-            
-            val (targetCourse, courseError) = findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
+            val (targetCourse, courseError) = MoodleApiClientUtil.findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
             if (courseError != null) return@addTool courseError
 
             val assignmentResponse = moodleClient.getAssignments(listOf(targetCourse!!.id))
@@ -111,11 +109,11 @@ fun runServer() {
                 )
 
             
-            val (targetCourse, courseError) = findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
+            val (targetCourse, courseError) =MoodleApiClientUtil.findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
             if (courseError != null) return@addTool courseError
 
             
-            val (targetAssignment, assignmentError) = findAndValidateAssignment(moodleClient, targetCourse!!.id, assignmentName)
+            val (targetAssignment, assignmentError) = MoodleApiClientUtil.findAndValidateAssignment(moodleClient, targetCourse!!.id, assignmentName)
             if (assignmentError != null) return@addTool assignmentError
 
             val submissionStatus = moodleClient.getSubmissionStatus(targetAssignment!!.id)
@@ -226,10 +224,10 @@ fun runServer() {
                 )
             }
             
-            val (targetCourse, courseError) = findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
+            val (targetCourse, courseError) = MoodleApiClientUtil.findAndValidateCourse(moodleClient, cachedUserInfo.userid, courseName)
             if (courseError != null) return@addTool courseError
 
-            val (targetAssignment, assignmentError) = findAndValidateAssignment(moodleClient, targetCourse!!.id, assignmentName)
+            val (targetAssignment, assignmentError) = MoodleApiClientUtil.findAndValidateAssignment(moodleClient, targetCourse!!.id, assignmentName)
             if (assignmentError != null) return@addTool assignmentError
 
             val submissionStatus = moodleClient.getSubmissionStatus(targetAssignment!!.id)
@@ -299,29 +297,6 @@ fun runServer() {
 }
 
 /**
- * コース名からコースを検索する
- */
-private suspend fun findCourseByName(client: MoodleApiClient, userId: Int, courseName: String): Course? {
-    val courses = client.getUserCourses(userId)
-    return courses.find { course ->
-        course.fullname.contains(courseName, ignoreCase = true) ||
-                course.shortname.contains(courseName, ignoreCase = true) ||
-                course.displayname.contains(courseName, ignoreCase = true)
-    }
-}
-
-/**
- * 課題名から課題を検索する
- */
-private fun findAssignmentByName(assignmentResponse: com.punyo.kotlinmcpserver.moodle.data.AssignmentResponse, assignmentName: String): Assignment? {
-    return assignmentResponse.courses
-        .flatMap { it.assignments }
-        .find { assignment ->
-            assignment.name.contains(assignmentName, ignoreCase = true)
-        }
-}
-
-/**
  * Unixタイムスタンプを日本時間の読みやすい形式に変換
  */
 private fun formatUnixTimestamp(timestamp: Long): String {
@@ -356,54 +331,4 @@ private fun getGradingStatusText(status: String): String {
         "released" -> "公開済み"
         else -> status
     }
-}
-
-
-private suspend fun findAndValidateCourse(
-    moodleClient: MoodleApiClient,
-    userId: Int,
-    courseName: String
-): Pair<Course?, CallToolResult?> {
-    val targetCourse = findCourseByName(moodleClient, userId, courseName)
-    
-    if (targetCourse == null) {
-        val courses = moodleClient.getUserCourses(userId)
-        val errorResult = CallToolResult(
-            content = listOf(
-                TextContent(
-                    "Course '$courseName' not found. Available courses: ${
-                        courses.joinToString(", ") { it.fullname }
-                    }"
-                )
-            )
-        )
-        return Pair(null, errorResult)
-    }
-    
-    return Pair(targetCourse, null) 
-}
-
-private suspend fun findAndValidateAssignment(
-    moodleClient: MoodleApiClient,
-    courseId: Int,
-    assignmentName: String
-): Pair<Assignment?, CallToolResult?> {
-    val assignmentResponse = moodleClient.getAssignments(listOf(courseId))
-    val targetAssignment = findAssignmentByName(assignmentResponse, assignmentName)
-    
-    if (targetAssignment == null) {
-        val errorResult = CallToolResult(
-            content = listOf(
-                TextContent(
-                    "Assignment '$assignmentName' not found. Available assignments: ${
-                        assignmentResponse.courses
-                            .flatMap { it.assignments }.joinToString(", ") { it.name }
-                    }"
-                )
-            )
-        )
-        return Pair(null, errorResult)
-    }
-    
-    return Pair(targetAssignment, null) 
 }
