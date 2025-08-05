@@ -16,18 +16,6 @@ import io.ktor.serialization.kotlinx.json.*
 import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
 
-/**
- * 名古屋工業大学Moodle Web Service APIクライアント
- * 
- * このクラスは、Moodle Web Service APIへのアクセスを提供します。
- * 環境変数MOODLE_TOKENからAPIトークンを取得し、各種APIエンドポイントへの
- * リクエストを処理します。
- * 
- * @property baseUrl MoodleのREST APIエンドポイントURL
- * @property uploadUrl MoodleのファイルアップロードエンドポイントURL
- * @property wstoken Web Service認証トークン（環境変数MOODLE_TOKENから取得）
- * @property httpClient HTTPクライアント（Ktorを使用）
- */
 class MoodleApiClient {
     private val baseUrl = "https://cms7.ict.nitech.ac.jp/moodle40a/webservice/rest/server.php"
     private val uploadUrl = "https://cms7.ict.nitech.ac.jp/moodle40a/webservice/upload.php"
@@ -181,10 +169,10 @@ class MoodleApiClient {
             }
         )
         
-        // レスポンスをテキストとして取得してからJSONパーシング
+        
         val responseText = response.bodyAsText()
         
-        // JSONパーシング用のJsonオブジェクトを作成（ignoreUnknownKeysを有効化）
+        
         val json = Json {
             ignoreUnknownKeys = true
             isLenient = true
@@ -211,28 +199,12 @@ class MoodleApiClient {
             url = baseUrl,
             formParameters = parameters.build()
         )
-        
-        // レスポンスをテキストとして取得
         val responseText = response.bodyAsText()
-        
-        // 空の配列や警告メッセージをパーシング
-        return try {
-            val json = Json {
-                ignoreUnknownKeys = true
-                isLenient = true
-            }
-            
-            // まず、空の配列かどうかチェック
-            if (responseText.trim() == "[]") {
+        return if (responseText.trim() == "[]") {
                 emptyList()
             } else {
-                // 警告やエラーメッセージがある場合は文字列として返す
                 listOf(responseText)
             }
-        } catch (e: Exception) {
-            // パーシングに失敗した場合は、生のレスポンスを返す
-            listOf(responseText)
-        }
     }
     
     /**

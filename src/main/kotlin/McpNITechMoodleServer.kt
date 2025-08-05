@@ -1,8 +1,5 @@
 package com.punyo.kotlinmcpserver
 
-// 名古屋工業大学Moodle用MCPサーバー実装
-// このファイルはMoodleApiClientを使用してMCPサーバーを構築します
-
 import com.punyo.kotlinmcpserver.moodle.MoodleApiClient
 import com.punyo.kotlinmcpserver.moodle.data.UserInfo
 import io.modelcontextprotocol.kotlin.sdk.*
@@ -18,10 +15,7 @@ import io.ktor.utils.io.streams.*
 import java.io.File
 
 fun runServer() {
-    // MoodleApiClientのインスタンスを作成
     val moodleClient = MoodleApiClient()
-
-    // 起動時にユーザー情報を取得してキャッシュ
     val cachedUserInfo: UserInfo = runBlocking {
         try {
             val userInfo = moodleClient.getUserInfo()
@@ -33,18 +27,18 @@ fun runServer() {
         }
     }
 
-    // MCPサーバーインスタンスを作成
+    
     val server = Server(
         Implementation(
-            name = "nitechMoodleMCPServer", // サーバー名
-            version = "1.0.0" // バージョン
+            name = "nitechMoodleMCPServer", 
+            version = "1.0.0" 
         ),
         ServerOptions(
             capabilities = ServerCapabilities(tools = ServerCapabilities.Tools(listChanged = true))
         )
     )
 
-    // 指定されたコースの課題一覧を取得するツールを登録
+    
     server.addTool(
         name = "get_assignments",
         description = """
@@ -62,19 +56,19 @@ fun runServer() {
         )
     ) { request ->
         try {
-            // リクエストからコース名パラメータを取得
+            
             val courseName = request.arguments["course_name"]?.jsonPrimitive?.content
                 ?: return@addTool CallToolResult(
                     content = listOf(TextContent("The 'course_name' parameter is required."))
                 )
 
-            // キャッシュされたユーザー情報を使用
+            
             val userInfo = cachedUserInfo
 
-            // ユーザーのコース一覧を取得
+            
             val courses = moodleClient.getUserCourses(userInfo.userid)
 
-            // 指定されたコース名に一致するコースを検索
+            
             val targetCourse = courses.find { course ->
                 course.fullname.contains(courseName, ignoreCase = true) ||
                         course.shortname.contains(courseName, ignoreCase = true) ||
@@ -86,14 +80,14 @@ fun runServer() {
                     content = listOf(
                         TextContent(
                             "Course '$courseName' not found. Available courses: ${
-                                courses.map { it.fullname }.joinToString(", ")
+                                courses.joinToString(", ") { it.fullname }
                             }"
                         )
                     )
                 )
             }
 
-            // 課題一覧を取得
+            
             val assignmentResponse = moodleClient.getAssignments(listOf(targetCourse.id))
 
             CallToolResult(content = listOf(TextContent(assignmentResponse.toString())))
@@ -106,7 +100,7 @@ fun runServer() {
         }
     }
 
-    // 指定された課題の提出状況を取得するツールを登録
+    
     server.addTool(
         name = "get_submission_status",
         description = """
@@ -128,7 +122,7 @@ fun runServer() {
         )
     ) { request ->
         try {
-            // リクエストからパラメータを取得
+            
             val courseName = request.arguments["course_name"]?.jsonPrimitive?.content
                 ?: return@addTool CallToolResult(
                     content = listOf(TextContent("The 'course_name' parameter is required."))
@@ -139,13 +133,13 @@ fun runServer() {
                     content = listOf(TextContent("The 'assignment_name' parameter is required."))
                 )
 
-            // キャッシュされたユーザー情報を使用
+            
             val userInfo = cachedUserInfo
 
-            // ユーザーのコース一覧を取得
+            
             val courses = moodleClient.getUserCourses(userInfo.userid)
 
-            // 指定されたコース名に一致するコースを検索
+            
             val targetCourse = courses.find { course ->
                 course.fullname.contains(courseName, ignoreCase = true) ||
                         course.shortname.contains(courseName, ignoreCase = true) ||
@@ -158,10 +152,10 @@ fun runServer() {
                 )
             }
 
-            // 課題一覧を取得
+            
             val assignmentResponse = moodleClient.getAssignments(listOf(targetCourse.id))
 
-            // 指定された課題名に一致する課題を検索
+            
             val targetAssignment = assignmentResponse.courses
                 .flatMap { it.assignments }
                 .find { assignment ->
@@ -185,10 +179,10 @@ fun runServer() {
                 )
             }
 
-            // 提出状況を取得
+            
             val submissionStatus = moodleClient.getSubmissionStatus(targetAssignment.id)
 
-            // 提出状況を整形
+            
             val statusText = buildString {
                 append("課題「${targetAssignment.name}」の提出状況:\n\n")
 
@@ -240,7 +234,7 @@ fun runServer() {
         }
     }
 
-    // 課題を提出するツールを登録
+    
     server.addTool(
         name = "submit",
         description = """
@@ -266,7 +260,7 @@ fun runServer() {
         )
     ) { request ->
         try {
-            // リクエストからパラメータを取得
+            
             val courseName = request.arguments["course_name"]?.jsonPrimitive?.content
                 ?: return@addTool CallToolResult(
                     content = listOf(TextContent("The 'course_name' parameter is required."))
@@ -282,7 +276,7 @@ fun runServer() {
                     content = listOf(TextContent("The 'submit_file_path' parameter is required."))
                 )
 
-            // ファイルの存在確認
+            
             val file = File(submitFilePath)
             if (!file.exists()) {
                 return@addTool CallToolResult(
@@ -296,13 +290,13 @@ fun runServer() {
                 )
             }
 
-            // キャッシュされたユーザー情報を使用
+            
             val userInfo = cachedUserInfo
 
-            // ユーザーのコース一覧を取得
+            
             val courses = moodleClient.getUserCourses(userInfo.userid)
 
-            // 指定されたコース名に一致するコースを検索
+            
             val targetCourse = courses.find { course ->
                 course.fullname.contains(courseName, ignoreCase = true) ||
                         course.shortname.contains(courseName, ignoreCase = true) ||
@@ -314,17 +308,17 @@ fun runServer() {
                     content = listOf(
                         TextContent(
                             "Course '$courseName' not found. Available courses: ${
-                                courses.map { it.fullname }.joinToString(", ")
+                                courses.joinToString(", ") { it.fullname }
                             }"
                         )
                     )
                 )
             }
 
-            // 課題一覧を取得
+            
             val assignmentResponse = moodleClient.getAssignments(listOf(targetCourse.id))
 
-            // 指定された課題名に一致する課題を検索
+            
             val targetAssignment = assignmentResponse.courses
                 .flatMap { it.assignments }
                 .find { assignment ->
@@ -348,7 +342,7 @@ fun runServer() {
                 )
             }
 
-            // 提出可能かどうか確認
+            
             val submissionStatus = moodleClient.getSubmissionStatus(targetAssignment.id)
             if (!submissionStatus.lastattempt.cansubmit && !submissionStatus.lastattempt.canedit) {
                 return@addTool CallToolResult(
@@ -356,7 +350,7 @@ fun runServer() {
                 )
             }
 
-            // ステップ1: ファイルをアップロード
+            
             val fileContent = file.readBytes()
             val uploadedFiles = moodleClient.uploadFile(fileContent, file.name)
 
@@ -366,13 +360,13 @@ fun runServer() {
                 )
             }
 
-            // ステップ2: アイテムIDを取得
+            
             val itemId = uploadedFiles.first().itemid
 
-            // ステップ3: 提出を保存
+            
             val saveResult = moodleClient.saveSubmission(targetAssignment.id, itemId)
 
-            // 結果を整形
+            
             val resultText = buildString {
                 append("ファイル提出が完了しました。\n\n")
                 append("コース: ${targetCourse.fullname}\n")
@@ -401,18 +395,18 @@ fun runServer() {
         }
     }
 
-    // サーバー通信用の標準IOを使用するトランスポートを作成
+    
     val transport = StdioServerTransport(
         System.`in`.asInput(),
         System.out.asSink().buffered()
     )
 
-    // サーバーを起動して接続を待機
+    
     runBlocking {
         server.connect(transport)
         val done = Job()
         server.onClose {
-            moodleClient.close() // リソースを解放
+            moodleClient.close() 
             done.complete()
         }
         done.join()
